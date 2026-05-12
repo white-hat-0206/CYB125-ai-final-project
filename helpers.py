@@ -298,10 +298,37 @@ def get_system_identity(snapshot):
 def get_password_policy(snapshot):
     info = {}
     try:
-        # TODO Milestone 3: parse `net accounts` and populate the 7 fields
-        # listed in the comment block above. Use run_command() to invoke
-        # the command, then walk its output line by line.
-        pass
+        # Run the 'net accounts' command to get password policy settings; this provides Windows account policies in text format
+        output = run_command(["net", "accounts"])
+        
+        # Parse each line of the output; 'net accounts' outputs lines like "Label: value"
+        for line in output.splitlines():
+            if ":" in line:
+                # Split on the first colon to separate label and value, then strip whitespace
+                parts = line.split(":", 1)
+                label = parts[0].strip()
+                value = parts[1].strip()
+                
+                # Map the label to the corresponding JSON key; only process the 7 specified fields
+                key_map = {
+                    "Minimum password length": "minimum_password_length",
+                    "Minimum password age (days)": "minimum_password_age_days",
+                    "Maximum password age (days)": "maximum_password_age_days",
+                    "Length of password history maintained": "password_history_length",
+                    "Lockout threshold": "lockout_threshold",
+                    "Lockout duration (minutes)": "lockout_duration_minutes",
+                    "Lockout observation window (minutes)": "lockout_observation_window_minutes"
+                }
+                
+                if label in key_map:
+                    # Convert value to int if possible, or None if "Never"; choice: using None for "Never" as per spec, could use -1 but None is clearer for JSON
+                    if value.lower() == "never":
+                        info[key_map[label]] = None
+                    else:
+                        try:
+                            info[key_map[label]] = int(value)
+                        except ValueError:
+                            info[key_map[label]] = None  # If conversion fails, treat as None
     except Exception as e:
         add_warning(snapshot, "password_policy failed: " + str(e))
     return info
