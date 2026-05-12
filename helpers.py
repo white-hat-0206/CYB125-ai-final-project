@@ -374,9 +374,53 @@ def get_password_policy(snapshot):
 def get_installed_software(snapshot):
     software = []
     try:
-        # TODO Milestone 4: walk the Uninstall hive and append a dict
-        # for each program with a DisplayName.
-        pass
+        # Define the base registry path for installed programs.
+        base_key = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
+        
+        # Open the parent registry key so we can enumerate its subkeys.
+        uninstall_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, base_key)
+        
+        # winreg.EnumKey returns one subkey name at a time when given an index.
+        # When the index is too large, EnumKey raises OSError to signal the end.
+        i = 0
+        while True:
+            try:
+                sub_name = winreg.EnumKey(uninstall_key, i)
+            except OSError:
+                # No more subkeys remain; this is the normal loop exit condition.
+                break
+            
+            # Build the full registry path to the current subkey.
+            full_path = base_key + "\\" + sub_name
+            
+            # Read the program name; if it's missing, skip this entry entirely.
+            display_name = get_registry_value(winreg.HKEY_LOCAL_MACHINE, full_path, "DisplayName")
+            if display_name:
+                # Read the remaining values for this program.
+                display_version = get_registry_value(winreg.HKEY_LOCAL_MACHINE, full_path, "DisplayVersion")
+                publisher = get_registry_value(winreg.HKEY_LOCAL_MACHINE, full_path, "Publisher")
+                install_date_raw = get_registry_value(winreg.HKEY_LOCAL_MACHINE, full_path, "InstallDate")
+                
+                # Convert YYYYMMDD string to ISO date. If parsing fails, leave as None.
+                if install_date_raw is not None:
+                    try:
+                        install_date = datetime.datetime.strptime(str(install_date_raw), "%Y%m%d").date().isoformat()
+                    except Exception:
+                        install_date = None  # Could also choose to keep the raw string, but None is cleaner for missing/invalid dates.
+                else:
+                    install_date = None  # Some installers don't write InstallDate, so we represent that as None.
+                
+                software.append({
+                    "display_name": display_name,
+                    "display_version": display_version,
+                    "publisher": publisher,
+                    "install_date": install_date
+                })
+            
+            i += 1
+        
+        # Close the opened registry key when done.
+        winreg.CloseKey(uninstall_key)
     except Exception as e:
         add_warning(snapshot, "installed_software failed: " + str(e))
     return software
