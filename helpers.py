@@ -235,9 +235,25 @@ def get_snapshot_metadata(snapshot):
 def get_system_identity(snapshot):
     info = {}
     try:
-        # TODO Milestone 2: implement the 5 registry reads described above.
-        # Use the get_registry_value() helper — do NOT call winreg directly.
-        pass
+        # Read the OS product name from the registry; this identifies the Windows version (e.g., "Windows 11 Enterprise")
+        info["os_name"] = get_registry_value(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion", "ProductName")
+        
+        # Read the current build number; this shows the specific build version for patch level verification
+        info["os_build"] = get_registry_value(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion", "CurrentBuild")
+        
+        # Read the edition ID; this indicates the Windows edition type (e.g., "Enterprise")
+        info["os_edition"] = get_registry_value(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion", "EditionID")
+        
+        # Read the registered owner; this is the user name set during installation
+        info["registered_owner"] = get_registry_value(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion", "RegisteredOwner")
+        
+        # Read the install date as a Unix timestamp (integer); convert to ISO UTC string for JSON compatibility
+        # Choice: Using ISO format with 'Z' suffix for UTC clarity; could use other formats but this matches the spec
+        install_epoch = get_registry_value(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion", "InstallDate")
+        if install_epoch is not None:
+            info["install_date_utc"] = datetime.datetime.utcfromtimestamp(install_epoch).isoformat() + "Z"
+        else:
+            info["install_date_utc"] = None  # Leave as None if the value is missing, as per spec
     except Exception as e:
         add_warning(snapshot, "system_identity failed: " + str(e))
     return info
