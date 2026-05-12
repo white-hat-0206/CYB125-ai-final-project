@@ -83,8 +83,8 @@ def main():
     snapshot["installed_software"] = helpers.get_installed_software(snapshot)
 
     # ===== Milestone 5 =====
-    # print("Collecting running processes...")
-    # helpers.add_running_processes(snapshot)   # mutator — no assignment
+    print("Collecting running processes...")
+    helpers.add_running_processes(snapshot)   # mutator — no assignment
 
     # ===== Milestone 6 =====
     # print("Collecting persistence locations...")

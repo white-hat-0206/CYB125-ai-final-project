@@ -468,10 +468,41 @@ def get_installed_software(snapshot):
 
 def add_running_processes(snapshot):
     try:
-        # TODO Milestone 5: parse `tasklist /fo csv` and append one dict
-        # per process to snapshot["running_processes"].
-        # Remember: this function does NOT return anything.
-        pass
+        # Run tasklist in CSV format so we can parse each process row reliably.
+        output = run_command(["tasklist", "/fo", "csv"])
+        
+        # csv.reader handles quoted CSV fields, which tasklist uses for process names.
+        reader = csv.reader(output.splitlines())
+        
+        # The first row is a header row; skip it so we only process real process entries.
+        first_row = True
+        for row in reader:
+            if first_row:
+                first_row = False
+                continue
+            
+            # tasklist CSV returns at least two fields: Image Name and PID.
+            if len(row) < 2:
+                continue
+            
+            # Strip whitespace from the process name and PID text.
+            process_name = row[0].strip()
+            pid_text = row[1].strip()
+            
+            # Convert PID text to int; if it fails, store None instead of crashing.
+            try:
+                pid_value = int(pid_text)
+            except Exception:
+                pid_value = None  # Using None for invalid PID values is safer than leaving a bad string.
+            
+            # Append the required process dict directly into the snapshot list.
+            snapshot["running_processes"].append({
+                "pid": pid_value,
+                "parent_pid": None,        # not available from tasklist
+                "name": process_name if process_name else None,
+                "executable_path": None,   # not available from tasklist
+                "command_line": None       # not available from tasklist
+            })
     except Exception as e:
         add_warning(snapshot, "running_processes failed: " + str(e))
 
